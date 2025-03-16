@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Button, Image, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Marker } from '../../types';
 
 export default function MarkerDetails() {
@@ -16,21 +17,54 @@ export default function MarkerDetails() {
     images: [],
   });
 
+  // Загрузка данных маркера из AsyncStorage при монтировании компонента
+  useEffect(() => {
+    const loadMarker = async () => {
+      try {
+        const savedMarker = await AsyncStorage.getItem(`marker_${id}`);
+        if (savedMarker) {
+          setMarker(JSON.parse(savedMarker));
+        }
+      } catch (error) {
+        console.error('Ошибка при загрузке маркера:', error);
+      }
+    };
+
+    loadMarker();
+  }, [id]);
+
+  // Сохранение данных маркера в AsyncStorage при изменении
+  useEffect(() => {
+    const saveMarker = async () => {
+      try {
+        await AsyncStorage.setItem(`marker_${id}`, JSON.stringify(marker));
+      } catch (error) {
+        console.error('Ошибка при сохранении маркера:', error);
+      }
+    };
+
+    saveMarker();
+  }, [marker, id]);
+
   // Функция для выбора изображения из галереи
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+      });
 
-    if (!result.canceled) {
-      const newImage = result.assets[0].uri;
-      setMarker((prev) => ({
-        ...prev,
-        images: [...(prev.images || []), newImage],
-      }));
+      if (!result.canceled) {
+        const newImage = result.assets[0].uri;
+        setMarker((prev) => ({
+          ...prev,
+          images: [...(prev.images || []), newImage],
+        }));
+      }
+    } catch (error) {
+      Alert.alert('Ошибка', 'Не удалось выбрать изображение.');
     }
   };
 
@@ -63,10 +97,8 @@ export default function MarkerDetails() {
         Координаты: {marker.latitude.toFixed(4)}, {marker.longitude.toFixed(4)}
       </Text>
 
-      {/* Кнопка для добавления изображения */}
       <Button title="Добавить изображение" onPress={pickImage} />
 
-      {/* Список изображений */}
       <View style={styles.imageContainer}>
         {marker.images?.map((uri, index) => (
           <View key={index} style={styles.imageWrapper}>
@@ -81,7 +113,6 @@ export default function MarkerDetails() {
         ))}
       </View>
 
-      {/* Кнопка для возврата на экран карты */}
       <Button title="Назад к карте" onPress={() => router.back()} />
     </ScrollView>
   );
